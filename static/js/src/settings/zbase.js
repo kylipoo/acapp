@@ -212,7 +212,7 @@ class Settings {
             this.root.AcWingOS.api.window.close();
         } else {
             $.ajax({
-                url: "https://app5257.acapp.acwing.com.cn/settings/logout/",
+                url: "https://app165.acapp.acwing.com.cn/settings/logout/",
                 type: "GET",
                 success: function(resp) {
                     if (resp.result === "success") {
@@ -250,7 +250,7 @@ class Settings {
         let outer = this;
 
         $.ajax({
-            url: "https://app5257.acapp.acwing.com.cn/settings/acwing/acapp/apply_code/",
+            url: "https://app165.acapp.acwing.com.cn/settings/acwing/acapp/apply_code/",
             type: "GET",
             success: function(resp) {
                 if (resp.result === "success") {
@@ -264,7 +264,7 @@ class Settings {
         let outer = this;
 
         $.ajax({
-            url: "https://app5257.acapp.acwing.com.cn/settings/getinfo/",
+            url: "https://app165.acapp.acwing.com.cn/settings/getinfo/",
             type: "GET",
             data: {
                 platform: outer.platform,

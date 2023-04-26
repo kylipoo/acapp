@@ -5,47 +5,53 @@ class AcGameMenu {
 <div class="ac-game-menu">
     <div class="ac-game-menu-field">
         <div class="ac-game-menu-field-item ac-game-menu-field-item-single-mode">
-            Single
+           Single mode
         </div>
         <br>
         <div class="ac-game-menu-field-item ac-game-menu-field-item-multi-mode">
-            Multiple
+           Multi mode
         </div>
         <br>
-        <div class="ac-game-menu-field-item ac-game-menu-field-item-settings-mode">
-            Exit
+        <div class="ac-game-menu-field-item ac-game-menu-field-item-settings">
+           Exit
         </div>
     </div>
 </div>
-            `);
-        this.$menu.hide();
+`);
+        //this.$menu.hide();
         this.root.$ac_game.append(this.$menu);
-        this.$single_mode=this.$menu.find('.ac-game-menu-field-item-single-mode');
-        this.$multi_mode=this.$menu.find('.ac-game-menu-field-item-multi-mode');
-        this.$settings_mode=this.$menu.find('.ac-game-menu-field-item-settings-mode');
+        this.$single_mode = this.$menu.find('.ac-game-menu-field-item-single-mode');
+        this.$multi_mode = this.$menu.find('.ac-game-menu-field-item-multi-mode');
+        this.$settings = this.$menu.find('.ac-game-menu-field-item-settings');
+
         this.start();
     }
+
     start() {
         this.add_listening_events();
     }
 
     add_listening_events() {
         let outer = this;
-        this.$single_mode.click(() => {
-           outer.hide();
-            outer.root.playground.show();
+        this.$single_mode.click(function(){
+            outer.hide();
+            outer.root.playground.show("single mode");
         });
-        this.$multi_mode.click(()=> {
-           console.log("click multi mode");
+        this.$multi_mode.click(function(){
+            outer.hide();
+            outer.root.playground.show("multi mode");
         });
-        this.$settings_mode.click(()=> {
+        this.$settings.click(function(){
             outer.root.settings.logout_on_remote();
         });
-     }
-    show() {
+    }
+
+    show() {  // 显示menu界面
         this.$menu.show();
     }
-    hide() {
+
+    hide() {  // 关闭menu界面
         this.$menu.hide();
     }
 }
+
