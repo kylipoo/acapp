@@ -1,1 +1,1 @@
- great project
+Make the ball move by right click
