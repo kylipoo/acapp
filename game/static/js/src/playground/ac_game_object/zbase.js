@@ -1,5 +1,5 @@
 let AC_GAME_OBJECTS = [];
-
+let EPS = 0.1;
 class AcGameObject {
     constructor() {
         AC_GAME_OBJECTS.push(this);
