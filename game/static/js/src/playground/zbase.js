@@ -1,35 +1,53 @@
-class AcGamePlayground {
-    constructor(root) {
+class AcGamePlayground
+{
+    constructor(root)
+    {
         this.root = root;
-        this.$playground = $(`<div class="ac-game-playground">hello playground</div>`);
+        this.$playground = $(`
+<div class="ac-game-playground"></div>`);
 
-        this.hide();
         this.root.$ac_game.append(this.$playground);
-
-        this.start();
-    }
-
-
-    start() {
-    }
-
-    show(mode) {  // 打开playground界面
-        let outer = this;
-        this.$playground.show();
 
         this.width = this.$playground.width();
         this.height = this.$playground.height();
 
-        this.mode = mode;
-        this.state = "waiting";  // waiting -> fighting -> over
+        this.game_map = new GameMap(this); // 创建一个地图
+        this.players = []; // 创建一个用于储存玩家的数组
 
+        this.players.push(new Player(this, this.width / 2, this.height / 2, this.height * 0.05, "white", true, this.height * 0.15)); // 创建一个是自己的玩家
+
+        this.$back = this.$playground.find('.ac-game-playground-item-back')
+        this.start();
     }
 
-    hide() {  // 关闭playground界面
+    add_listening_events()
+    {
+        let outer = this;
+        this.$back.click(function(){
+            outer.hide();
+            outer.root.$menu.show();
+        });
+    }
 
-        this.$playground.empty();
+    show()
+    {
+        this.$playground.show();
+    }
 
+    hide()
+    {
         this.$playground.hide();
+    }
+
+    start()
+    {
+        this.hide();
+        this.add_listening_events();
+    }
+
+    update()
+    {
+
     }
 }
 
