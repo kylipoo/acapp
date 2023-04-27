@@ -1,5 +1,10 @@
 let AC_GAME_OBJECTS = [];
 let EPS = 0.1;
+let GET_DIST = function(x1, y1, x2, y2)
+{
+    let dx = x1 - x2, dy = y1 - y2;
+    return Math.sqrt(dx * dx + dy * dy);
+}
 class AcGameObject {
     constructor() {
         AC_GAME_OBJECTS.push(this);

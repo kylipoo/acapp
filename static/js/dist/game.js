@@ -57,6 +57,11 @@ class AcGameMenu {
 
 let AC_GAME_OBJECTS = [];
 let EPS = 0.1;
+let GET_DIST = function(x1, y1, x2, y2)
+{
+    let dx = x1 - x2, dy = y1 - y2;
+    return Math.sqrt(dx * dx + dy * dy);
+}
 class AcGameObject {
     constructor() {
         AC_GAME_OBJECTS.push(this);
@@ -157,6 +162,59 @@ class GameMap extends AcGameObject {
     }
 }
 
+class Particle extends AcGameObject
+{
+    constructor(playground, x, y, radius, color, vx, vy, speed)
+    {
+        super();
+        this.playground = playground;
+        this.ctx = this.playground.game_map.ctx;
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        this.color = color;
+
+        this.vx = vx;
+        this.vy = vy;
+        this.speed = speed;
+    }
+
+    render()
+    {
+        this.ctx.beginPath();
+        this.ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+        this.ctx.fillStyle = this.color;
+        this.ctx.fill();
+    }
+
+    start()
+    {
+        this.friction_speed = 0.8;
+        this.friction_radius = 0.8;
+    }
+
+    update()
+    {
+        this.update_move();
+        this.render();
+    }
+
+    update_move()
+    {
+        if (this.speed < EPS * 10 || this.radius < EPS * 10)
+        {
+            this.destroy();
+            return false;
+        }
+
+        this.x += this.vx * this.speed * this.timedelta / 1000;
+        this.y += this.vy * this.speed * this.timedelta / 1000;
+
+        this.speed *= this.friction_speed;
+        this.radius *= this.friction_radius;
+    }
+
+}
 class Player extends AcGameObject
 {
     constructor(playground, x, y, radius, color, is_me, speed)
@@ -165,20 +223,22 @@ class Player extends AcGameObject
 
         this.playground = playground; // 所属playground
         this.ctx = this.playground.game_map.ctx; // 操作的画笔
-
-        this.x = x;  // 坐标
-        this.y = y; // 坐标
-        this.radius = radius; // 半径
-        this.color = color; // 颜色
-        this.is_me = is_me; // 玩家类型
-        this.move_length = 0;
-
-        this.speed = speed; // 速度i
+        this.is_me = is_me;
         this.is_alive = true; // 是否存活
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.damage_x = 0;
+        this.damage_y = 0;
+        this.damage_speed = 0;
+        this.move_length = 0;
+        this.radius = radius;
+        this.color = color;
+        this.speed = speed;
+        this.spent_time = 0;
+        this.fireballs = [];
 
-        this.eps = 0.01; // 精度，这里建议定义为全局变量，EPS = 0.1，在这个教程里以后都这么用。
-        this.vx = 1;
-        this.vy = 1;
         this.cur_skill = null;
 
     }
@@ -227,16 +287,9 @@ class Player extends AcGameObject
         });
     }
 
-
-    get_dist(x1, y1, x2, y2) {
-        let dx = x1 - x2;
-        let dy = y1 - y2;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
     move_to(tx, ty)
     {
-        this.move_length = this.get_dist(this.x, this.y, tx, ty); // 跟目的地的距离
+        this.move_length = GET_DIST(this.x, this.y, tx, ty); // 跟目的地的距离
         let dx = tx - this.x, dy = ty - this.y;
         let angle = Math.atan2(dy, dx); // 计算角度，这里Math.atan2(y, x)相当于求arctan(y / x);
 
@@ -272,12 +325,87 @@ class Player extends AcGameObject
 
     update()
     {
+        this.update_AI();
         this.update_move();
         this.render(); // 同样要一直画一直画（yxc：“人不吃饭会死，物体不一直画会消失。”）
     }
 
+    update_AI()
+    {
+        if (this.is_me) return false; // 如果这不是一个机器人就直接退出
+
+        this.update_AI_move();
+    }
+
+    update_AI_move()
+    {
+        if (this.move_length < EPS) // 如果停下来就随机选个地方走向那边
+        {
+            let tx = Math.random() * this.playground.width;
+            let ty = Math.random() * this.playground.height;
+
+            this.move_to(tx, ty);
+        }
+    }
+    is_attacked(obj)
+    {
+        let angle = Math.atan2(this.y - obj.y, this.x - obj.x); // 角度
+        let damage = obj.damage; // 伤害
+        // 注意，这里被伤害之后的表现，就是什么方向碰撞就是什么伤害，简单的向量方向计算
+        this.is_attacked_concrete(angle, damage);
+    }
+
+    is_attacked_concrete(angle, damage) // 被具体伤害
+    {
+        this.explode_particle(); // 爆发粒子
+        this.radius -= damage; // 这里半径就是血量
+        this.friction_damage = 0.8; // 击退移动摩擦力
+
+        if (this.is_died()) return false; // 已经去世了吗
+
+        this.x_damage = Math.cos(angle);
+        this.y_damage = Math.sin(angle); // (x_damage, y_damage)是伤害向量的方向向量
+        this.speed_damage = damage * 100; // 击退速度
+    }
+    explode_particle()
+    {
+        for (let i = 0; i < 10 + Math.random() * 5; ++ i) // 粒子数
+        {
+            let x = this.x, y = this.y;
+            let radius = this.radius / 3;
+            let angle = Math.PI * 2 * Math.random(); // 随机方向
+            let vx = Math.cos(angle), vy = Math.sin(angle);
+            let color = this.color;
+            let speed = this.speed * 10;
+
+            new Particle(this.playground, x, y, radius, color, vx, vy, speed); // 创建粒子对象
+        }
+    }
+
+    is_died()
+    {
+        if (this.radius < EPS * 10) // 少于这个数表示已经去世
+        {
+            this.destroy(); // 去世
+            return true;
+        }
+        return false;
+    }
+
+
     update_move() // 将移动单独写为一个过程
     {
+
+        if (this.speed_damage && this.speed_damage > EPS) // 如果此时在被击退的状态，就不能自己动
+        {
+            this.vx = this.vy = 0; // 不能自己动
+            this.move_length = 0; // 不能自己动
+            this.x += this.x_damage * this.speed_damage * this.timedelta / 1000; // 被击退的移动
+            this.y += this.y_damage * this.speed_damage * this.timedelta / 1000; // 被击退的移动
+            this.speed_damage *= this.friction_damage; // 摩擦力，表现出一个被击退越来越慢的效果
+        }
+
+
         if (this.move_length < EPS) // 移动距离没了（小于精度）
         {
             this.move_length = 0; // 全都停下了
@@ -307,6 +435,10 @@ class Player extends AcGameObject
     }
 }
 
+let IS_COLLISION = function(obj1, obj2) // 这是一个全局函数，代表两个物体之间是否碰撞
+{
+    return GET_DIST(obj1.x, obj1.y, obj2.x, obj2.y) < obj1.radius + obj2.radius; // 很简单的两圆相交条件
+}
 class Fireball extends AcGameObject
 {
     constructor(playground, player, x, y, radius, color, damage, vx, vy, speed, move_dist)
@@ -343,11 +475,49 @@ class Fireball extends AcGameObject
 
     }
 
+    is_satisfy_collision(obj) // 真的碰撞的条件
+    {
+        if (this === obj) return false; // 自身不会被攻击
+        if (this.player === obj) return false; // 发射源不会被攻击
+        return IS_COLLISION(this, obj); // 距离是否满足
+    }
+
+    hit(obj) // 碰撞
+    {
+        obj.is_attacked && obj.is_attacked(this); // obj被this攻击了
+        this.is_attacked(obj); // this被obj攻击了
+    }
+
+    is_attacked(obj) // 被伤害
+    {
+        this.is_attacked_concrete(0, 0); // 具体被伤害多少，火球不需要关注伤害值和血量，因为碰到后就直接消失
+    }
+
+    is_attacked_concrete(angle, damage) // 具体被伤害
+    {
+        this.destroy(); // 直接消失
+    }
+
     update()
     {
+        this.update_attack();
         this.update_move();
         this.render();
     }
+
+    update_attack()
+    {
+        for (let i = 0; i < AC_GAME_OBJECTS.length; ++ i)
+        {
+            let obj = AC_GAME_OBJECTS[i];
+            if (this.is_satisfy_collision(obj)) // 如果真的碰撞了（这样可以保证碰撞条件可以自行定义，以后会很好维护）
+            {
+                this.hit(obj); // 两个物体碰撞了
+                break; // 火球，只能碰到一个物体
+            }
+        }
+    }
+
 
     update_move()
     {
@@ -364,6 +534,16 @@ class Fireball extends AcGameObject
     }
 }
 
+let HEX = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+
+let GET_RANDOM_COLOR = function(){
+    let color = "#";
+    for (let i = 0; i < 6; ++ i)
+    {
+        color += HEX[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
 class AcGamePlayground
 {
     constructor(root)
@@ -381,6 +561,10 @@ class AcGamePlayground
         this.players = []; // 创建一个用于储存玩家的数组
 
         this.players.push(new Player(this, this.width / 2, this.height / 2, this.height * 0.05, "white", true, this.height * 0.15)); // 创建一个是自己的玩家
+        for (let i = 0; i < 5; ++ i)
+        {
+            this.players.push(new Player(this, this.width / 2, this.height / 2, this.height * 0.05, GET_RANDOM_COLOR(), false, this.height * 0.15));    
+        }
 
         this.$back = this.$playground.find('.ac-game-playground-item-back')
         this.start();

@@ -1,3 +1,7 @@
+let IS_COLLISION = function(obj1, obj2) // 这是一个全局函数，代表两个物体之间是否碰撞
+{
+    return GET_DIST(obj1.x, obj1.y, obj2.x, obj2.y) < obj1.radius + obj2.radius; // 很简单的两圆相交条件
+}
 class Fireball extends AcGameObject
 {
     constructor(playground, player, x, y, radius, color, damage, vx, vy, speed, move_dist)
@@ -34,11 +38,49 @@ class Fireball extends AcGameObject
 
     }
 
+    is_satisfy_collision(obj) // 真的碰撞的条件
+    {
+        if (this === obj) return false; // 自身不会被攻击
+        if (this.player === obj) return false; // 发射源不会被攻击
+        return IS_COLLISION(this, obj); // 距离是否满足
+    }
+
+    hit(obj) // 碰撞
+    {
+        obj.is_attacked && obj.is_attacked(this); // obj被this攻击了
+        this.is_attacked(obj); // this被obj攻击了
+    }
+
+    is_attacked(obj) // 被伤害
+    {
+        this.is_attacked_concrete(0, 0); // 具体被伤害多少，火球不需要关注伤害值和血量，因为碰到后就直接消失
+    }
+
+    is_attacked_concrete(angle, damage) // 具体被伤害
+    {
+        this.destroy(); // 直接消失
+    }
+
     update()
     {
+        this.update_attack();
         this.update_move();
         this.render();
     }
+
+    update_attack()
+    {
+        for (let i = 0; i < AC_GAME_OBJECTS.length; ++ i)
+        {
+            let obj = AC_GAME_OBJECTS[i];
+            if (this.is_satisfy_collision(obj)) // 如果真的碰撞了（这样可以保证碰撞条件可以自行定义，以后会很好维护）
+            {
+                this.hit(obj); // 两个物体碰撞了
+                break; // 火球，只能碰到一个物体
+            }
+        }
+    }
+
 
     update_move()
     {

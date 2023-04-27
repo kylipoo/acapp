@@ -6,20 +6,22 @@ class Player extends AcGameObject
 
         this.playground = playground; // 所属playground
         this.ctx = this.playground.game_map.ctx; // 操作的画笔
-
-        this.x = x;  // 坐标
-        this.y = y; // 坐标
-        this.radius = radius; // 半径
-        this.color = color; // 颜色
-        this.is_me = is_me; // 玩家类型
-        this.move_length = 0;
-
-        this.speed = speed; // 速度i
+        this.is_me = is_me;
         this.is_alive = true; // 是否存活
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.damage_x = 0;
+        this.damage_y = 0;
+        this.damage_speed = 0;
+        this.move_length = 0;
+        this.radius = radius;
+        this.color = color;
+        this.speed = speed;
+        this.spent_time = 0;
+        this.fireballs = [];
 
-        this.eps = 0.01; // 精度，这里建议定义为全局变量，EPS = 0.1，在这个教程里以后都这么用。
-        this.vx = 1;
-        this.vy = 1;
         this.cur_skill = null;
 
     }
@@ -68,16 +70,9 @@ class Player extends AcGameObject
         });
     }
 
-
-    get_dist(x1, y1, x2, y2) {
-        let dx = x1 - x2;
-        let dy = y1 - y2;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
     move_to(tx, ty)
     {
-        this.move_length = this.get_dist(this.x, this.y, tx, ty); // 跟目的地的距离
+        this.move_length = GET_DIST(this.x, this.y, tx, ty); // 跟目的地的距离
         let dx = tx - this.x, dy = ty - this.y;
         let angle = Math.atan2(dy, dx); // 计算角度，这里Math.atan2(y, x)相当于求arctan(y / x);
 
@@ -113,12 +108,87 @@ class Player extends AcGameObject
 
     update()
     {
+        this.update_AI();
         this.update_move();
         this.render(); // 同样要一直画一直画（yxc：“人不吃饭会死，物体不一直画会消失。”）
     }
 
+    update_AI()
+    {
+        if (this.is_me) return false; // 如果这不是一个机器人就直接退出
+
+        this.update_AI_move();
+    }
+
+    update_AI_move()
+    {
+        if (this.move_length < EPS) // 如果停下来就随机选个地方走向那边
+        {
+            let tx = Math.random() * this.playground.width;
+            let ty = Math.random() * this.playground.height;
+
+            this.move_to(tx, ty);
+        }
+    }
+    is_attacked(obj)
+    {
+        let angle = Math.atan2(this.y - obj.y, this.x - obj.x); // 角度
+        let damage = obj.damage; // 伤害
+        // 注意，这里被伤害之后的表现，就是什么方向碰撞就是什么伤害，简单的向量方向计算
+        this.is_attacked_concrete(angle, damage);
+    }
+
+    is_attacked_concrete(angle, damage) // 被具体伤害
+    {
+        this.explode_particle(); // 爆发粒子
+        this.radius -= damage; // 这里半径就是血量
+        this.friction_damage = 0.8; // 击退移动摩擦力
+
+        if (this.is_died()) return false; // 已经去世了吗
+
+        this.x_damage = Math.cos(angle);
+        this.y_damage = Math.sin(angle); // (x_damage, y_damage)是伤害向量的方向向量
+        this.speed_damage = damage * 100; // 击退速度
+    }
+    explode_particle()
+    {
+        for (let i = 0; i < 10 + Math.random() * 5; ++ i) // 粒子数
+        {
+            let x = this.x, y = this.y;
+            let radius = this.radius / 3;
+            let angle = Math.PI * 2 * Math.random(); // 随机方向
+            let vx = Math.cos(angle), vy = Math.sin(angle);
+            let color = this.color;
+            let speed = this.speed * 10;
+
+            new Particle(this.playground, x, y, radius, color, vx, vy, speed); // 创建粒子对象
+        }
+    }
+
+    is_died()
+    {
+        if (this.radius < EPS * 10) // 少于这个数表示已经去世
+        {
+            this.destroy(); // 去世
+            return true;
+        }
+        return false;
+    }
+
+
     update_move() // 将移动单独写为一个过程
     {
+
+        if (this.speed_damage && this.speed_damage > EPS) // 如果此时在被击退的状态，就不能自己动
+        {
+            this.vx = this.vy = 0; // 不能自己动
+            this.move_length = 0; // 不能自己动
+            this.x += this.x_damage * this.speed_damage * this.timedelta / 1000; // 被击退的移动
+            this.y += this.y_damage * this.speed_damage * this.timedelta / 1000; // 被击退的移动
+            this.speed_damage *= this.friction_damage; // 摩擦力，表现出一个被击退越来越慢的效果
+        }
+
+
         if (this.move_length < EPS) // 移动距离没了（小于精度）
         {
             this.move_length = 0; // 全都停下了
