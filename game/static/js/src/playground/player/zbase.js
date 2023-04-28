@@ -33,6 +33,10 @@ class Player extends AcGameObject
 
     render()
     {
+        this.ctx.beginPath();
+        this.ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2, false);
+        this.ctx.fillStyle = this.color;
+        this.ctx.fill();
         if (this.is_me)
         {
             // 如果是自己，就画上头像
