@@ -23,18 +23,37 @@ class Player extends AcGameObject
         this.fireballs = [];
 
         this.cur_skill = null;
+        if (this.is_me) // 如果这是自己
+        {
+            this.img = new Image(); // 头像的图片
+            this.img.src = this.playground.root.settings.photo; // 头像的图片的URL
+        }
 
     }
 
     render()
     {
-        this.x += this.vx;
-        this.y += this.vy;
-        // 画圆的方法，请照抄，深入了解同样自行查阅菜鸟教程
-        this.ctx.beginPath();
-        this.ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
-        this.ctx.fillStyle = this.color;
-        this.ctx.fill();
+        if (this.is_me)
+        {
+            // 如果是自己，就画上头像
+            this.ctx.save();
+            this.ctx.beginPath();
+            this.ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            this.lineWidth = EPS * 10;
+            this.ctx.stroke();
+            this.ctx.clip();
+            this.ctx.drawImage(this.img, this.x - this.radius, this.y - this.radius, this.radius * 2, this.radius * 2);
+            this.ctx.restore();
+        } else {
+
+            this.x += this.vx;
+            this.y += this.vy;
+            // 画圆的方法，请照抄，深入了解同样自行查阅菜鸟教程
+            this.ctx.beginPath();
+            this.ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            this.ctx.fillStyle = this.color;
+            this.ctx.fill();
+        }
     }
 
     add_listening_events()
