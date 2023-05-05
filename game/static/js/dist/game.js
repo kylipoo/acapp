@@ -104,17 +104,82 @@ let AC_GAME_ANIMATION = function(timestamp) {
 
 
 requestAnimationFrame(AC_GAME_ANIMATION);
+class ChatField {
+    constructor(playground){
+        this.playground = playground;
+        this.$history = $(`<div class="ac-game-chat-field-history">history</div>`);
+        this.$input = $(`<input type="text" class="ac-game-chat-field-input">`);
+        this.$history.hide();
+        this.$input.hide();
+        this.func_id = null;
+        this.playground.$playground.append(this.$history);
+        this.playground.$playground.append(this.$input);
+        this.start();
+    }
+    start() {
+        this.add_listening_events();
+    }
+    add_listening_events() {
+        let outer = this;
+        this.$input.keydown(function(e) {
+            if(e.which === 27) {
+                outer.hide_input();
+                return false;
+            } else if (e.which === 13) {
+                let username = outer.playground.root.settings.username;
+                let text = outer.$input.val();
+                if(text) {
+                    outer.$input.val("");
+                    outer.add_message(username, text);
+                    outer.playground.mps.send_message(username, text);
+                }
+                return false
+            };
+        });
+    }
+    render_message(message) {
+        return $(`<div>${message}</div>`);
+    }
+    add_message(username, text) {
+        this.show_history();
+        let message = `[${username}]${text}`;
+        this.$history.append(this.render_message(message));
+        this.$history.scrollTop(this.$history[0].scrollHeight);
+
+    }
+    show_history() {
+        let outer = this;
+        this.$history.fadeIn();
+        if(this.func_id) clearTimeout(this.func_id);
+
+        this.func_id = setTimeout(function() {
+            outer.$history.fadeOut();
+            this.func_id=null;
+        }, 3000);
+    }
+    show_input(){
+        this.show_history();
+        this.$input.show();
+        this.$input.focus();
+    }
+    hide_input() {
+        this.$input.hide();
+        this.playground.game_map.$canvas.focus();
+    }
+}
 class GameMap extends AcGameObject {
     constructor(playground) {
         super();
         this.playground = playground;
-        this.$canvas = $(`<canvas></canvas>`);
+        this.$canvas = $(`<canvas tabindex=0></canvas>`);
         this.ctx = this.$canvas[0].getContext('2d');
         this.ctx.canvas.width = this.playground.width;
         this.ctx.canvas.height = this.playground.height;
         this.playground.$playground.append(this.$canvas);
     }
-    start() {}
+    start() {
+        this.$canvas.focus();
+    }
     resize() {
         this.ctx.canvas.width = this.playground.width;
         this.ctx.canvas.height = this.playground.height;
@@ -131,174 +196,6 @@ class GameMap extends AcGameObject {
 
 
 }
-class MultiPlayerSocket {
-    constructor(playground) {
-        this.playground = playground;
-
-        this.ws = new WebSocket("wss://app5257.acapp.acwing.com.cn/wss/multiplayer/");
-
-        this.start();
-    }
-
-    start() {
-        this.receive();
-    }
-
-    receive () {
-        let outer = this;
-
-        this.ws.onmessage = function(e) {
-            let data = JSON.parse(e.data);
-            let uuid = data.uuid;
-            if (uuid === outer.uuid) return false;
-
-            let event = data.event;
-            if (event === "create_player") {
-                outer.receive_create_player(uuid, data.username, data.photo);
-            } else if (event === "move_to") {
-                outer.receive_move_to(uuid, data.tx, data.ty);
-            } else if (event === "shoot_fireball") {
-                outer.receive_shoot_fireball(uuid, data.tx, data.ty, data.ball_uuid);
-            } else if (event === "attack") {
-                outer.receive_attack(uuid, data.attackee_uuid, data.x, data.y, data.angle, data.damage, data.ball_uuid);
-            } else if (event === "blink") {
-                outer.receive_blink(uuid, data.tx, data.ty);
-            } else if (event === "message") {
-                outer.receive_message(uuid, data.username, data.text);
-            }
-        };
-    }
-
-    send_create_player(username, photo) {
-        let outer = this;
-        this.ws.send(JSON.stringify({
-            'event': "create_player",
-            'uuid': outer.uuid,
-            'username': username,
-            'photo': photo,
-        }));
-    }
-
-    get_player(uuid) {
-        let players = this.playground.players;
-        for (let i = 0; i < players.length; i ++ ) {
-            let player = players[i];
-            if (player.uuid === uuid)
-                return player;
-        }
-
-        return null;
-    }
-
-    receive_create_player(uuid, username, photo) {
-        let player = new Player(
-            this.playground,
-            this.playground.width / 2 / this.playground.scale,
-            0.5,
-            0.05,
-            "white",
-            0.15,
-            "enemy",
-            username,
-            photo,
-        );
-
-        player.uuid = uuid;
-        this.playground.players.push(player);
-    }
-
-    send_move_to(tx, ty) {
-        let outer = this;
-        this.ws.send(JSON.stringify({
-            'event': "move_to",
-            'uuid': outer.uuid,
-            'tx': tx,
-            'ty': ty,
-        }));
-    }
-
-    receive_move_to(uuid, tx, ty) {
-        let player = this.get_player(uuid);
-
-        if (player) {
-            player.move_to(tx, ty);
-        }
-    }
-
-    send_shoot_fireball(tx, ty, ball_uuid) {
-        let outer = this;
-        this.ws.send(JSON.stringify({
-            'event': "shoot_fireball",
-            'uuid': outer.uuid,
-            'tx': tx,
-            'ty': ty,
-            'ball_uuid': ball_uuid,
-        }));
-    }
-
-    receive_shoot_fireball(uuid, tx, ty, ball_uuid) {
-        let player = this.get_player(uuid);
-        if (player) {
-            let fireball = player.shoot_fireball(tx, ty);
-            fireball.uuid = ball_uuid;
-        }
-    }
-
-    send_attack(attackee_uuid, x, y, angle, damage, ball_uuid) {
-        let outer = this;
-        this.ws.send(JSON.stringify({
-            'event': "attack",
-            'uuid': outer.uuid,
-            'attackee_uuid': attackee_uuid,
-            'x': x,
-            'y': y,
-            'angle': angle,
-            'damage': damage,
-            'ball_uuid': ball_uuid,
-        }));
-    }
-
-    receive_attack(uuid, attackee_uuid, x, y, angle, damage, ball_uuid) {
-        let attacker = this.get_player(uuid);
-        let attackee = this.get_player(attackee_uuid);
-
-        if (attacker && attackee) {
-            attackee.receive_attack(x, y, angle, damage, ball_uuid, attacker);
-        }
-    }
-
-    send_blink(tx, ty) {
-        let outer = this;
-        this.ws.send(JSON.stringify({
-            'event': "blink",
-            'uuid': outer.uuid,
-            'tx': tx,
-            'ty': ty,
-        }));
-    }
-
-    receive_blink(uuid, tx, ty) {
-        let player = this.get_player(uuid);
-        if (player) {
-            player.blink(tx, ty);
-        }
-    }
-
-    send_message(username, text) {
-        let outer =this;
-        this.ws.send(JSON.stringify({
-            'event': "message",
-            'uuid': outer.uuid,
-            'username': username,
-            'text': text,
-        }));
-    }
-
-    receive_message(uuid, username, text) {
-        this.playground.chat_field.add_message(username, text);
-    }
-}
-
 class NoticeBoard extends AcGameObject {
     constructor(playground) {
         super();
@@ -427,8 +324,9 @@ class Player extends AcGameObject {
             return false;
         });
         this.playground.game_map.$canvas.mousedown(function(e) {
+         
             if (outer.playground.state !== "fighting")
-                return false;
+                return true;
 
             const rect = outer.ctx.canvas.getBoundingClientRect();
             if (e.which === 3) {
@@ -466,24 +364,36 @@ class Player extends AcGameObject {
             }
         });
 
-        $(window).keydown(function(e) {
-            if (outer.playground.state !== "fighting")
-                return true;
+       this.playground.game_map.$canvas.keydown(function(e) {
+           if(e.which === 13) {
+               if(outer.playground.mode === "multi mode") {
+                   outer.playground.chat_field.show_input();
+                   return false;
+               }
+           } else if(e.which === 27)  {
+               if(outer.playground.mode === "multi mode") {
+                   outer.playground.chat_field.hide_input();
+                   return false;
+               }
+           }
 
-            if (e.which === 81) {  // q
-                if (outer.fireball_coldtime > outer.eps)
-                    return true;
+           if (outer.playground.state !== "fighting")
+               return true;
 
-                outer.cur_skill = "fireball";
-                return false;
-            } else if (e.which === 70) {  // f
-                if (outer.blink_coldtime > outer.eps)
-                    return true;
+           if (e.which === 81) {  // q
+               if (outer.fireball_coldtime > outer.eps)
+                   return true;
 
-                outer.cur_skill = "blink";
-                return false;
-            }
-        });
+               outer.cur_skill = "fireball";
+               return false;
+           } else if (e.which === 70) {  // f
+               if (outer.blink_coldtime > outer.eps)
+                   return true;
+
+               outer.cur_skill = "blink";
+               return false;
+           }
+       });
     }
 
     shoot_fireball(tx, ty) {
@@ -777,6 +687,174 @@ class FireBall extends AcGameObject {
 
 
 }
+class MultiPlayerSocket {
+    constructor(playground) {
+        this.playground = playground;
+
+        this.ws = new WebSocket("wss://app5257.acapp.acwing.com.cn/wss/multiplayer/");
+
+        this.start();
+    }
+
+    start() {
+        this.receive();
+    }
+
+    receive () {
+        let outer = this;
+
+        this.ws.onmessage = function(e) {
+            let data = JSON.parse(e.data);
+            let uuid = data.uuid;
+            if (uuid === outer.uuid) return false;
+
+            let event = data.event;
+            if (event === "create_player") {
+                outer.receive_create_player(uuid, data.username, data.photo);
+            } else if (event === "move_to") {
+                outer.receive_move_to(uuid, data.tx, data.ty);
+            } else if (event === "shoot_fireball") {
+                outer.receive_shoot_fireball(uuid, data.tx, data.ty, data.ball_uuid);
+            } else if (event === "attack") {
+                outer.receive_attack(uuid, data.attackee_uuid, data.x, data.y, data.angle, data.damage, data.ball_uuid);
+            } else if (event === "blink") {
+                outer.receive_blink(uuid, data.tx, data.ty);
+            } else if (event === "message") {
+                outer.receive_message(uuid, data.username, data.text);
+            }
+        };
+    }
+
+    send_create_player(username, photo) {
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "create_player",
+            'uuid': outer.uuid,
+            'username': username,
+            'photo': photo,
+        }));
+    }
+
+    get_player(uuid) {
+        let players = this.playground.players;
+        for (let i = 0; i < players.length; i ++ ) {
+            let player = players[i];
+            if (player.uuid === uuid)
+                return player;
+        }
+
+        return null;
+    }
+
+    receive_create_player(uuid, username, photo) {
+        let player = new Player(
+            this.playground,
+            this.playground.width / 2 / this.playground.scale,
+            0.5,
+            0.05,
+            "white",
+            0.15,
+            "enemy",
+            username,
+            photo,
+        );
+
+        player.uuid = uuid;
+        this.playground.players.push(player);
+    }
+
+    send_move_to(tx, ty) {
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "move_to",
+            'uuid': outer.uuid,
+            'tx': tx,
+            'ty': ty,
+        }));
+    }
+
+    receive_move_to(uuid, tx, ty) {
+        let player = this.get_player(uuid);
+
+        if (player) {
+            player.move_to(tx, ty);
+        }
+    }
+
+    send_shoot_fireball(tx, ty, ball_uuid) {
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "shoot_fireball",
+            'uuid': outer.uuid,
+            'tx': tx,
+            'ty': ty,
+            'ball_uuid': ball_uuid,
+        }));
+    }
+
+    receive_shoot_fireball(uuid, tx, ty, ball_uuid) {
+        let player = this.get_player(uuid);
+        if (player) {
+            let fireball = player.shoot_fireball(tx, ty);
+            fireball.uuid = ball_uuid;
+        }
+    }
+
+    send_attack(attackee_uuid, x, y, angle, damage, ball_uuid) {
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "attack",
+            'uuid': outer.uuid,
+            'attackee_uuid': attackee_uuid,
+            'x': x,
+            'y': y,
+            'angle': angle,
+            'damage': damage,
+            'ball_uuid': ball_uuid,
+        }));
+    }
+
+    receive_attack(uuid, attackee_uuid, x, y, angle, damage, ball_uuid) {
+        let attacker = this.get_player(uuid);
+        let attackee = this.get_player(attackee_uuid);
+
+        if (attacker && attackee) {
+            attackee.receive_attack(x, y, angle, damage, ball_uuid, attacker);
+        }
+    }
+
+    send_blink(tx, ty) {
+        let outer = this;
+        this.ws.send(JSON.stringify({
+            'event': "blink",
+            'uuid': outer.uuid,
+            'tx': tx,
+            'ty': ty,
+        }));
+    }
+
+    receive_blink(uuid, tx, ty) {
+        let player = this.get_player(uuid);
+        if (player) {
+            player.blink(tx, ty);
+        }
+    }
+
+    send_message(username, text) {
+        let outer =this;
+        this.ws.send(JSON.stringify({
+            'event': "message",
+            'uuid': outer.uuid,
+            'username': username,
+            'text': text,
+        }));
+    }
+
+    receive_message(uuid, username, text) {
+        this.playground.chat_field.add_message(username, text);
+    }
+}
+
 class AcGamePlayground {
     constructor(root) {
         this.root = root;
@@ -821,6 +899,7 @@ class AcGamePlayground {
                 this.players.push (new Player(this,  this.width/2/this.scale,0.5, 0.05, this.get_random_color(), 0.15, "robot"));
             }
         } else if(mode === "multi mode") {
+            this.chat_field = new ChatField(this);
             this.mps = new MultiPlayerSocket(this);
             this.mps.uuid = this.players[0].uuid;
             this.mps.ws.onopen = function() {

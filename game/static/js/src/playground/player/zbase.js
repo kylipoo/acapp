@@ -64,8 +64,9 @@ class Player extends AcGameObject {
             return false;
         });
         this.playground.game_map.$canvas.mousedown(function(e) {
+         
             if (outer.playground.state !== "fighting")
-                return false;
+                return true;
 
             const rect = outer.ctx.canvas.getBoundingClientRect();
             if (e.which === 3) {
@@ -103,24 +104,36 @@ class Player extends AcGameObject {
             }
         });
 
-        $(window).keydown(function(e) {
-            if (outer.playground.state !== "fighting")
-                return true;
+       this.playground.game_map.$canvas.keydown(function(e) {
+           if(e.which === 13) {
+               if(outer.playground.mode === "multi mode") {
+                   outer.playground.chat_field.show_input();
+                   return false;
+               }
+           } else if(e.which === 27)  {
+               if(outer.playground.mode === "multi mode") {
+                   outer.playground.chat_field.hide_input();
+                   return false;
+               }
+           }
 
-            if (e.which === 81) {  // q
-                if (outer.fireball_coldtime > outer.eps)
-                    return true;
+           if (outer.playground.state !== "fighting")
+               return true;
 
-                outer.cur_skill = "fireball";
-                return false;
-            } else if (e.which === 70) {  // f
-                if (outer.blink_coldtime > outer.eps)
-                    return true;
+           if (e.which === 81) {  // q
+               if (outer.fireball_coldtime > outer.eps)
+                   return true;
 
-                outer.cur_skill = "blink";
-                return false;
-            }
-        });
+               outer.cur_skill = "fireball";
+               return false;
+           } else if (e.which === 70) {  // f
+               if (outer.blink_coldtime > outer.eps)
+                   return true;
+
+               outer.cur_skill = "blink";
+               return false;
+           }
+       });
     }
 
     shoot_fireball(tx, ty) {
